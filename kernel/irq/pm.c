@@ -11,7 +11,6 @@
 #include <linux/interrupt.h>
 #include <linux/suspend.h>
 #include <linux/syscore_ops.h>
-
 #include "internals.h"
 
 bool irq_pm_check_wakeup(struct irq_desc *desc)
