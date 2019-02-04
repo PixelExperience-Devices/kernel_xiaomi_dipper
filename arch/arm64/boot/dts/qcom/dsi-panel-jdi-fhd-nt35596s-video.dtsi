@@ -57,11 +57,6 @@
 		qcom,disp-paneloff-disablecabc-enabled;
 		qcom,mdss-night-brightness = <7 25 43 61>;
 		qcom,disp-panel-offon-mode-enabled;
-		qcom,mdss-dsi-panel-hdr-enabled;
-		qcom,mdss-dsi-panel-hdr-color-primaries = <14500 15500 32000
-			17000 15500 30000 8000 3000>;
-		qcom,mdss-dsi-panel-peak-brightness = <4200000>;
-		qcom,mdss-dsi-panel-blackness-level = <3230>;
 		qcom,mdss-dsi-panel-xy-coordinate = <0x0F 0x18>;
 		qcom,mdss-dsi-panel-max-luminance = <0x0F 0x20>;
 		qcom,mdss-dsi-panel-max-luminance-valid = <0x01 0x01>;
