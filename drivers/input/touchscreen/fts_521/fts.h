@@ -36,6 +36,7 @@
 #include <linux/sysfs.h>
 #include <linux/notifier.h>
 #include <linux/mutex.h>
+#include <linux/pm_qos.h>
 #include "fts_lib/ftsSoftware.h"
 #include "fts_lib/ftsHardware.h"
 /****************** CONFIGURATION SECTION ******************/
@@ -284,6 +285,8 @@ struct fts_ts_info {
 	struct dentry *debugfs;
 #endif
 	bool lockdown_is_ok;
+
+	struct pm_qos_request pm_qos_req;
 };
 
 struct fts_mode_switch {
