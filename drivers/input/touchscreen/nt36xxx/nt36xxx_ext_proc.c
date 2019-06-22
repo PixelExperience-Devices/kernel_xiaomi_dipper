@@ -315,7 +315,7 @@ static int32_t c_show(struct seq_file *m, void *v)
 	seq_puts(m, "\n");
 #endif
 
-	seq_printf(m, "\n\n");
+	seq_puts(m, "\n\n");
 	return 0;
 }
 
