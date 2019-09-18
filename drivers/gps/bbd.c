@@ -69,7 +69,7 @@ struct bbd_cdev_priv {
 	const char *name;
 	struct cdev dev;			/* char device */
 	bool busy;
-	struct circ_buf read_buf;	    	/* LHD reads from BBD */
+	struct circ_buf read_buf;		/* LHD reads from BBD */
 	struct mutex lock;			/* Lock for read_buf */
 	char _read_buf[BBD_BUFF_SIZE];		/* LHD reads from BBD */
 	char write_buf[BBD_BUFF_SIZE];		/* LHD writes into BBD */
@@ -97,7 +97,6 @@ static const char *bbd_dev_name[BBD_DEVICE_INDEX] = {
 	"bbd_sensor",
 	"bbd_control",
 	"bbd_patch",
-	//"bbd_ssi_spi_debug"
 };
 
 static dev_t devno;
@@ -134,8 +133,7 @@ static unsigned char legacy_bbd_patch[] = {
 #endif
 
 /* Function to push read data into any bbd device's read buf */
-ssize_t bbd_on_read(unsigned int minor,
-					const unsigned char *buf, size_t size);
+ssize_t bbd_on_read(unsigned int minor, const unsigned char *buf, size_t size);
 
 //--------------------------------------------------------------
 //
@@ -170,38 +168,34 @@ EXPORT_SYMBOL(bbd_register);
  * @size: size of sensor packet
  * @return: pushed data length = success
  */
-struct sensor_pkt {
-	unsigned short size;
-	unsigned char buf[1022];	/*We assume max SSP packet less than 1KB */
-} __attribute__((__packed__)) ss_pkt;
-
 ssize_t bbd_send_packet(unsigned char *buf, size_t size)
 {
+	struct sensor_pkt {
+		unsigned short size;
+		unsigned char buf[1022];	/*We assume max SSP packet less than 1KB */
+	} __attribute__((__packed__)) ss_pkt;
+
 	memset(&ss_pkt, 0, sizeof(ss_pkt));
 	ss_pkt.size = (unsigned short)size;
 	memcpy(ss_pkt.buf, buf, size);
 
-	return bbd_on_read(BBD_MINOR_SENSOR,
-					(unsigned char *)&ss_pkt, size+2); /* +2 for pkt.size */
+	return bbd_on_read(BBD_MINOR_SENSOR, (unsigned char *)&ss_pkt, size + 2); /* +2 for pkt.size */
 }
 EXPORT_SYMBOL(bbd_send_packet);
 
 
 /**
- * bbd_pull_packet - Interface function called
- * from SHMD to read sensor packet.
+ * bbd_pull_packet - Interface function called from SHMD to read sensor packet.
  *
- *     Read packet consists of sensor packet from gpsd/lhd and from BBD.
+ *	 Read packet consists of sensor packet from gpsd/lhd and from BBD.
  *
  * @buf: buffer to receive packet
  * @size:
- * @timeout_ms: if specified, this function waits for sensor
- * packet during given time
+ * @timeout_ms: if specified, this function waits for sensor packet during given time
  *
  * @return: popped data length = success
  */
-ssize_t bbd_pull_packet(unsigned char *buf, size_t size,
-						unsigned int timeout_ms)
+ssize_t bbd_pull_packet(unsigned char *buf, size_t size, unsigned int timeout_ms)
 {
 	struct circ_buf *circ = &bbd.priv[BBD_MINOR_SHMD].read_buf;
 	size_t rd_size = 0;
@@ -225,8 +219,7 @@ ssize_t bbd_pull_packet(unsigned char *buf, size_t size,
 	 * copies from [tail..end] and [start..head]
 	 */
 	do {
-		size_t cnt_to_end = CIRC_CNT_TO_END(circ->head,
-											circ->tail, BBD_BUFF_SIZE);
+		size_t cnt_to_end = CIRC_CNT_TO_END(circ->head, circ->tail, BBD_BUFF_SIZE);
 		size_t copied = min(cnt_to_end, size);
 
 		memcpy(buf + rd_size, (void *) circ->buf + circ->tail, copied);
@@ -258,14 +251,11 @@ int bbd_mcu_reset(void)
 }
 EXPORT_SYMBOL(bbd_mcu_reset);
 
-
-
 //--------------------------------------------------------------
 //
 //               BBD device struct
 //
 //--------------------------------------------------------------
-
 /**
  * bbd_control - Handles command string from lhd
  *
@@ -273,25 +263,27 @@ EXPORT_SYMBOL(bbd_mcu_reset);
  */
 ssize_t bbd_control(const char *buf, ssize_t len)
 {
-	printk("%s : %s \n", __func__, buf);
+	pr_info("%s : %s\n", __func__, buf);
 
-	if (strnstr(buf, ESW_CTRL_READY, strlen(buf))) {
+	if (strstr(buf, ESW_CTRL_READY)) {
 
 		if (bbd.ssp_cb && bbd.ssp_cb->on_mcu_ready)
 			bbd.ssp_cb->on_mcu_ready(bbd.ssp_priv, true);
 #ifdef CONFIG_BCM_GPS_SPI_DRIVER
 		bcm477x_debug_info(ESW_CTRL_READY);
 #endif
-	} else if (strnstr(buf, ESW_CTRL_NOTREADY, strlen(buf))) {
+	} else if (strstr(buf, ESW_CTRL_NOTREADY)) {
 		struct circ_buf *circ = &bbd.priv[BBD_MINOR_SENSOR].read_buf;
+
 		circ->head = circ->tail = 0;
 		if (bbd.ssp_cb && bbd.ssp_cb->on_mcu_ready)
 			bbd.ssp_cb->on_mcu_ready(bbd.ssp_priv, false);
 #ifdef CONFIG_BCM_GPS_SPI_DRIVER
 		bcm477x_debug_info(ESW_CTRL_NOTREADY);
 #endif
-	} else if (strnstr(buf, ESW_CTRL_CRASHED, strlen(buf))) {
+	} else if (strstr(buf, ESW_CTRL_CRASHED)) {
 		struct circ_buf *circ = &bbd.priv[BBD_MINOR_SENSOR].read_buf;
+
 		circ->head = circ->tail = 0;
 
 		if (bbd.ssp_cb && bbd.ssp_cb->on_mcu_ready)
@@ -302,32 +294,28 @@ ssize_t bbd_control(const char *buf, ssize_t len)
 #ifdef CONFIG_BCM_GPS_SPI_DRIVER
 		bcm477x_debug_info(ESW_CTRL_CRASHED);
 #endif
-#if 0
-	} else if (strnstr(buf, BBD_CTRL_DEBUG_ON, strlen(buf))) {
-		bbd.db = true;
-#endif
-	} else if (strnstr(buf, BBD_CTRL_DEBUG_OFF, strlen(buf))) {
+	} else if (strstr(buf, BBD_CTRL_DEBUG_OFF)) {
 		bbd.db = false;
 #ifdef CONFIG_SENSORS_SSP
-	} else if (strnstr(buf, SSP_DEBUG_ON, strlen(buf))) {
+	} else if (strstr(buf, SSP_DEBUG_ON)) {
 		ssp_dbg = true;
 		ssp_pkt_dbg = true;
-	} else if (strnstr(buf, SSP_DEBUG_OFF, strlen(buf))) {
+	} else if (strstr(buf, SSP_DEBUG_OFF)) {
 		ssp_dbg = false;
 		ssp_pkt_dbg = false;
 #endif
 #ifdef CONFIG_BCM_GPS_SPI_DRIVER
-	} else if (strnstr(buf, SSI_DEBUG_ON, strlen(buf))) {
+	} else if (strstr(buf, SSI_DEBUG_ON)) {
 		ssi_dbg = true;
-	} else if (strnstr(buf, SSI_DEBUG_OFF, strlen(buf))) {
+	} else if (strstr(buf, SSI_DEBUG_OFF)) {
 		ssi_dbg = false;
-	} else if (strnstr(buf, PZC_DEBUG_ON, strlen(buf))) {
+	} else if (strstr(buf, PZC_DEBUG_ON)) {
 		ssi_dbg_pzc = true;
-	} else if (strnstr(buf, PZC_DEBUG_OFF, strlen(buf))) {
+	} else if (strstr(buf, PZC_DEBUG_OFF)) {
 		ssi_dbg_pzc = false;
-	} else if (strnstr(buf, RNG_DEBUG_ON, strlen(buf))) {
+	} else if (strstr(buf, RNG_DEBUG_ON)) {
 		ssi_dbg_rng = true;
-	} else if (strnstr(buf, RNG_DEBUG_OFF, strlen(buf))) {
+	} else if (strstr(buf, RNG_DEBUG_OFF)) {
 		ssi_dbg_rng = false;
 #endif
 	} else if (bbd.ssp_cb && bbd.ssp_cb->on_control) {
@@ -337,8 +325,6 @@ ssize_t bbd_control(const char *buf, ssize_t len)
 
 	return len;
 }
-
-
 
 //--------------------------------------------------------------
 //
@@ -382,16 +368,12 @@ int bbd_common_open(struct inode *inode, struct file *filp)
 static int bbd_common_release(struct inode *inode, struct file *filp)
 {
 	unsigned int minor = iminor(inode);
-	//struct bbd_device *bbd = filp->private_data;
-
-	pr_info("%s++\n", __func__);
 
 	BUG_ON(minor >= BBD_DEVICE_INDEX);
-	pr_info("%s", bbd.priv[minor].name);
 
+	pr_info("%s[%s]++\n", __func__, bbd.priv[minor].name);
 	bbd.priv[minor].busy = false;
-
-	pr_info("%s--\n", __func__);
+	pr_info("%s[%s]--\n", __func__, bbd.priv[minor].name);
 	return 0;
 }
 
@@ -409,7 +391,6 @@ static ssize_t bbd_common_read(struct file *filp,
 	struct circ_buf *circ = &bbd.priv[minor].read_buf;
 	size_t rd_size = 0;
 
-	pr_info("%s++\n", __func__);
 	BUG_ON(minor >= BBD_DEVICE_INDEX);
 
 	mutex_lock(&bbd.priv[minor].lock);
@@ -419,12 +400,10 @@ static ssize_t bbd_common_read(struct file *filp,
 	 * we may require 2 copies from [tail..end] and [end..head]
 	 */
 	do {
-		size_t cnt_to_end = CIRC_CNT_TO_END(circ->head,
-											circ->tail, BBD_BUFF_SIZE);
+		size_t cnt_to_end = CIRC_CNT_TO_END(circ->head, circ->tail, BBD_BUFF_SIZE);
 		size_t copied = min(cnt_to_end, size);
 
-		WARN_ON(copy_to_user(buf + rd_size,
-							(void *) circ->buf + circ->tail, copied));
+		WARN_ON(copy_to_user(buf + rd_size, (void *) circ->buf + circ->tail, copied));
 		size -= copied;
 		rd_size += copied;
 		circ->tail = (circ->tail + copied) & (BBD_BUFF_SIZE - 1);
@@ -479,15 +458,11 @@ static unsigned int bbd_common_poll(struct file *filp, poll_table *wait)
 	return mask;
 }
 
-
-
-
 //--------------------------------------------------------------
 //
 //               BBD Device Specific File Functions
 //
 //--------------------------------------------------------------
-
 /**
  * bbd_sensor_write - BBD's RPC calls this function to send sensor packet
  *
@@ -598,7 +573,6 @@ static const struct attribute_group bbd_group = {
 	.attrs = bbd_attributes,
 };
 
-
 //--------------------------------------------------------------
 //
 //               Misc Functions
@@ -606,7 +580,7 @@ static const struct attribute_group bbd_group = {
 //--------------------------------------------------------------
 void bbd_log_hex(const char *pIntroduction,
 		const unsigned char *pData,
-		unsigned long        ulDataLen)
+		unsigned long ulDataLen)
 {
 	const unsigned char *pDataEnd = pData + ulDataLen;
 
@@ -620,19 +594,21 @@ void bbd_log_hex(const char *pIntroduction,
 		size_t bufsize = sizeof(buf) - 3;
 		size_t lineLen = pDataEnd - pData;
 		size_t perLineCount = lineLen;
+
 		if (lineLen > 32) {
 			lineLen = 32;
 			perLineCount = lineLen;
 		}
 
 		snprintf(buf, bufsize, "%s [%u] { ", pIntroduction,
-					(unsigned int)lineLen);
+				(unsigned int)lineLen);
 
 		for (; perLineCount > 0; ++pData, --perLineCount) {
 			size_t len = strlen(buf);
+
 			snprintf(buf+len, bufsize - len, "%02X ", *pData);
 		}
-		printk(KERN_INFO"%s}\n", buf);
+		pr_info("%s}\n", buf);
 	}
 }
 
@@ -643,8 +619,7 @@ void bbd_log_hex(const char *pIntroduction,
  *
  * @buf: linear buffer
  */
-ssize_t bbd_on_read(unsigned int minor, const unsigned char *buf,
-					size_t size)
+ssize_t bbd_on_read(unsigned int minor, const unsigned char *buf, size_t size)
 {
 	struct circ_buf *circ = &bbd.priv[minor].read_buf;
 	size_t wr_size = 0;
@@ -664,8 +639,7 @@ ssize_t bbd_on_read(unsigned int minor, const unsigned char *buf,
 	 * We may require 2 copies from [head..end] and [start..head]
 	 */
 	do {
-		size_t space_to_end = CIRC_SPACE_TO_END(circ->head,
-												circ->tail, BBD_BUFF_SIZE);
+		size_t space_to_end = CIRC_SPACE_TO_END(circ->head, circ->tail, BBD_BUFF_SIZE);
 		size_t copied = min(space_to_end, size);
 
 		memcpy((void *) circ->buf + circ->head, buf + wr_size, copied);
@@ -686,15 +660,12 @@ skip:
 
 ssize_t bbd_request_mcu(bool on)
 {
-	printk("%s(%s) called", __func__, (on)?"On":"Off");
+	pr_info("%s(%s) called", __func__, (on) ? "On" : "Off");
 	if (on)
-		return bbd_on_read(BBD_MINOR_CONTROL,
-						   GPSD_SENSOR_ON, strlen(GPSD_SENSOR_ON)+1);
-	else {
-		bbd.ssp_cb->on_mcu_ready(bbd.ssp_priv, false);
-		return bbd_on_read(BBD_MINOR_CONTROL,
-						   GPSD_SENSOR_OFF, strlen(GPSD_SENSOR_OFF)+1);
-	}
+		return bbd_on_read(BBD_MINOR_CONTROL, GPSD_SENSOR_ON, strlen(GPSD_SENSOR_ON) + 1);
+
+	bbd.ssp_cb->on_mcu_ready(bbd.ssp_priv, false);
+	return bbd_on_read(BBD_MINOR_CONTROL, GPSD_SENSOR_OFF, strlen(GPSD_SENSOR_OFF) + 1);
 }
 EXPORT_SYMBOL(bbd_request_mcu);
 
@@ -705,7 +676,7 @@ EXPORT_SYMBOL(bbd_request_mcu);
 //--------------------------------------------------------------
 static int bbd_suspend(pm_message_t state)
 {
-	pr_info("[SSPBBD]: %s ++ \n", __func__);
+	pr_info("[SSPBBD]: %s ++\n", __func__);
 
 #ifdef CONFIG_SENSORS_SSP
 	/* Call SSP suspend */
@@ -714,7 +685,7 @@ static int bbd_suspend(pm_message_t state)
 #endif
 	mdelay(20);
 
-	pr_info("[SSPBBD]: %s -- \n", __func__);
+	pr_info("[SSPBBD]: %s --\n", __func__);
 	return 0;
 }
 
@@ -729,26 +700,26 @@ static int bbd_resume(void)
 	return 0;
 }
 
-static int bbd_notifier(struct notifier_block *nb,
-						unsigned long event, void *data)
+static int bbd_notifier(struct notifier_block *nb, unsigned long event, void *data)
 {
 	pm_message_t state = {0};
-		switch (event) {
-		case PM_SUSPEND_PREPARE:
-			printk("%s going to sleep", __func__);
-			state.event = event;
-			bbd_suspend(state);
-			break;
-		case PM_POST_SUSPEND:
-			printk("%s waking up", __func__);
-			bbd_resume();
-			break;
+
+	switch (event) {
+	case PM_SUSPEND_PREPARE:
+		pr_info("%s going to sleep", __func__);
+		state.event = event;
+		bbd_suspend(state);
+		break;
+	case PM_POST_SUSPEND:
+		pr_info("%s waking up", __func__);
+		bbd_resume();
+		break;
 	}
 	return NOTIFY_OK;
 }
 
 static struct notifier_block bbd_notifier_block = {
-				.notifier_call = bbd_notifier,
+	.notifier_call = bbd_notifier,
 };
 
 //--------------------------------------------------------------
@@ -756,21 +727,19 @@ static struct notifier_block bbd_notifier_block = {
 //               BBD Device Init and Exit
 //
 //--------------------------------------------------------------
-
-
 static const struct file_operations bbd_fops[BBD_DEVICE_INDEX] = {
 	/* bbd shmd file operations */
 	{
-			.owner          =  THIS_MODULE,
+		.owner		  =  THIS_MODULE,
 	},
 	/* bbd sensor file operations */
-		{
-				.owner          =  THIS_MODULE,
-				.open           =  bbd_common_open,
-				.release        =  bbd_common_release,
-				.read           =  bbd_common_read,
-				.write          =  NULL,
-				.poll           =  bbd_common_poll,
+	{
+		.owner		=  THIS_MODULE,
+		.open		=  bbd_common_open,
+		.release	=  bbd_common_release,
+		.read		=  bbd_common_read,
+		.write		=  NULL,
+		.poll		=  bbd_common_poll,
 	},
 	/* bbd control file operations */
 	{
@@ -790,18 +759,7 @@ static const struct file_operations bbd_fops[BBD_DEVICE_INDEX] = {
 		.write		=  NULL, /* /dev/bbd_patch is read-only */
 		.poll		=  NULL,
 	},
-	/* bbd ssi spi debug operations
-	{
-		.owner          =  THIS_MODULE,
-		.open		=  bbd_common_open,
-		.release	=  bbd_common_release,
-		.read           =  NULL,
-		.write          =  bbd_ssi_spi_debug_write,
-		.poll           =  NULL,
-	}
-	*/
 };
-
 
 int bbd_init(struct device *dev, bool legacy_patch)
 {
@@ -853,7 +811,8 @@ int bbd_init(struct device *dev, bool legacy_patch)
 		}
 
 		/* Register cdev which relates above device
-		 * number with this BBD device */
+		 * number with this BBD device
+		 */
 		cdev_init(cdev, &bbd_fops[minor]);
 		cdev->owner = THIS_MODULE;
 		cdev->ops = &bbd_fops[minor];
