@@ -56,8 +56,6 @@ MODULE_LICENSE("GPL v2");
 
 #define THERMAL_MAX_ACTIVE	16
 
-#define PAGESIZE 128
-
 static DEFINE_IDR(thermal_tz_idr);
 static DEFINE_IDR(thermal_cdev_idr);
 static DEFINE_MUTEX(thermal_idr_lock);
@@ -2694,7 +2692,7 @@ thermal_boost_store(struct device *dev,
 				      struct device_attribute *attr, const char *buf, size_t len)
 {
 	int ret;
-	ret = snprintf(boost_buf, PAGESIZE, buf);
+	ret = snprintf(boost_buf, PAGE_SIZE, buf);
 	return len;
 }
 
