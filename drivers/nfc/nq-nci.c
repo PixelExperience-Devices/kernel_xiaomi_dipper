@@ -239,7 +239,7 @@ static ssize_t nfc_read(struct file *filp, char __user *buf,
 	}
 
 	if (((tmp[0] & 0xff) == 0x61) && ((tmp[1] & 0xff) == 0x07) && ((tmp[2] & 0xff) == 0x01)) {
-		wake_lock_timeout(&fieldon_wl, msecs_to_jiffies(3*1000));
+		wake_lock_timeout(&fieldon_wl, msecs_to_jiffies(1*1000));
 	}
 #ifdef NFC_KERNEL_BU
 		dev_dbg(&nqx_dev->client->dev, "%s : NfcNciRx %x %x %x\n",
