@@ -787,7 +787,7 @@ static int pd_select_pdo(struct usbpd *pd, int pdo_pos, int uv, int ua)
 		pd->requested_voltage =
 			PD_SRC_PDO_FIXED_VOLTAGE(pdo) * 50 * 1000;
 
-		/*if limit_pd_vbus is enabled, pd request uv will less than pd vbus max*/
+		/* if limit_pd_vbus is enabled, pd request uv will less than pd vbus max */
 		if (pd->limit_pd_vbus && pd->requested_voltage > pd->pd_vbus_max_limit)
 			return -ENOTSUPP;
 
@@ -3947,8 +3947,7 @@ MODULE_PARM_DESC(pd_vbus_ctrl, "PD VBUS CONTROL");
 
 void pd_vbus_reset(struct usbpd *pd)
 {
-	if (!pd)
-	{
+	if (!pd) {
 		pr_err("pd_vbus_reset, pd is null\n");
 		return;
 	}
@@ -3961,9 +3960,7 @@ void pd_vbus_reset(struct usbpd *pd)
 		msleep(pd_vbus_ctrl);
 		start_usb_host(pd, true);
 		enable_vbus(pd);
-	}
-	else
-	{
+	} else {
 		pr_err("pd_vbus is not enabled yet\n");
 	}
 }
@@ -4010,8 +4007,7 @@ static ssize_t pd_vbus_store(struct device *dev,
 {
 	int val = 0;
 
-	if (sscanf(buf, "%d\n", &val) != 0)
-	{
+	if (sscanf(buf, "%d\n", &val) != 0) {
 		pr_err("pd_vbus_store input err\n");
 	}
 	pr_err("pd_vbus_store handle state %s, vbus %d,val %d\n",

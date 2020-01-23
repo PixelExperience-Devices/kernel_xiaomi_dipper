@@ -413,7 +413,7 @@ static struct fg_alg_flag pmi8998_v2_alg_flags[] = {
 	},
 };
 
-static int fg_gen3_debug_mask = FG_IRQ | FG_STATUS;
+static int fg_gen3_debug_mask;
 module_param_named(
 	debug_mask, fg_gen3_debug_mask, int, 0600
 );
@@ -682,18 +682,6 @@ static int fg_get_battery_temp(struct fg_chip *chip, int *val)
 	return 0;
 }
 
-static int fg_get_battery_esr(struct fg_chip *chip, int *val)
-{
-	int rc, esr_uohms;
-		rc = fg_get_sram_prop(chip, FG_SRAM_ESR, &esr_uohms);
-	if (rc < 0) {
-		pr_err("failed to get ESR, rc=%d\n", rc);
-		return rc;
-	}
-	*val = esr_uohms;
-	return esr_uohms;
-}
-
 static int fg_get_battery_resistance(struct fg_chip *chip, int *val)
 {
 	int rc, esr_uohms, rslow_uohms;
@@ -807,7 +795,6 @@ static int fg_get_msoc(struct fg_chip *chip, int *msoc)
 	if (rc < 0)
 		return rc;
 
-
 	/*
 	 * To have better endpoints for 0 and 100, it is good to tune the
 	 * calculation discarding values 0 and 255 while rounding off. Rest
@@ -823,12 +810,10 @@ static int fg_get_msoc(struct fg_chip *chip, int *msoc)
 		*msoc = 100;
 	else if (*msoc == 0)
 		*msoc = 0;
-	else if (*msoc >= FULL_SOC_REPORT_THR - 4 && *msoc <= FULL_SOC_REPORT_THR - 3 && chip->report_full)
-	{
+	else if (*msoc >= FULL_SOC_REPORT_THR - 4
+			&& *msoc <= FULL_SOC_REPORT_THR - 3 && chip->report_full) {
 		*msoc = DIV_ROUND_CLOSEST(*msoc * FULL_CAPACITY, FULL_SOC_RAW);
-	}
-	else
-	{
+	} else {
 		*msoc = DIV_ROUND_CLOSEST((*msoc - 1) * (FULL_CAPACITY - 2),
 				FULL_SOC_RAW - 2) + 1;
 	}
@@ -4158,9 +4143,6 @@ static int fg_psy_get_property(struct power_supply *psy,
 	case POWER_SUPPLY_PROP_RESISTANCE:
 		rc = fg_get_battery_resistance(chip, &pval->intval);
 		break;
-	case POWER_SUPPLY_PROP_ESR:
-		rc = fg_get_battery_esr(chip, &pval->intval);
-		break;
 	case POWER_SUPPLY_PROP_VOLTAGE_OCV:
 		rc = fg_get_sram_prop(chip, FG_SRAM_OCV, &pval->intval);
 		break;
@@ -4423,7 +4405,6 @@ static enum power_supply_property fg_psy_props[] = {
 	POWER_SUPPLY_PROP_CURRENT_NOW,
 	POWER_SUPPLY_PROP_RESISTANCE_ID,
 	POWER_SUPPLY_PROP_RESISTANCE,
-	POWER_SUPPLY_PROP_ESR,
 	POWER_SUPPLY_PROP_BATTERY_TYPE,
 	POWER_SUPPLY_PROP_CHARGE_FULL_DESIGN,
 	POWER_SUPPLY_PROP_VOLTAGE_MAX_DESIGN,
@@ -6367,11 +6348,11 @@ static int fg_gen3_probe(struct platform_device *pdev)
 	schedule_delayed_work(&chip->soc_monitor_work,
 				msecs_to_jiffies(MONITOR_SOC_WAIT_MS));
 	/*
-         * if vbat is above 3.7V and msoc is 0% and battery temperature is
-         * above 15 degree, we restart fg to do new first soc calculate to
-         * improve user experience when device is shutdown in cold then
-         * try to power on in normal temperature room.
-         */
+	 * if vbat is above 3.7V and msoc is 0% and battery temperature is
+	 * above 15 degree, we restart fg to do new first soc calculate to
+	 * improve user experience when device is shutdown in cold then
+	 * try to power on in normal temperature room.
+	 */
 	if ((volt_uv >= VBAT_RESTART_FG_EMPTY_UV)
 			   && (msoc == 0) && (batt_temp >= TEMP_THR_RESTART_FG))
 		schedule_delayed_work(&chip->empty_restart_fg_work,

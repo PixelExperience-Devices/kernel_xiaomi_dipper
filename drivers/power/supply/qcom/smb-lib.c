@@ -970,9 +970,11 @@ int smblib_rerun_apsd_if_required(struct smb_charger *chg)
 	if (!val.intval)
 		return 0;
 
-	/*rc = smblib_request_dpdm(chg, true);
+	/*
+	rc = smblib_request_dpdm(chg, true);
 	if (rc < 0)
-		smblib_err(chg, "Couldn't to enable DPDM rc=%d\n", rc);*/
+		smblib_err(chg, "Couldn't to enable DPDM rc=%d\n", rc);
+	*/
 
 	chg->uusb_apsd_rerun_done = true;
 
@@ -2048,10 +2050,8 @@ int smblib_get_prop_batt_status(struct smb_charger *chg,
 				union power_supply_propval *val)
 {
 	union power_supply_propval pval = {0, };
-	bool usb_online, dc_online;
-	/*bool qnovo_en;*/
-	/*u8 pt_en_cmd;*/
-	u8 stat;
+	bool usb_online, dc_online, qnovo_en;
+	u8 stat, pt_en_cmd;
 	int rc;
 
 	rc = smblib_get_prop_usb_online(chg, &pval);
@@ -2094,8 +2094,9 @@ int smblib_get_prop_batt_status(struct smb_charger *chg,
 			return 0;
 		}
 	}
-/*this is a workaround to support type-c apapter without PD*/
-	if ( chg->typec_en_dis_active && pval.intval != POWER_SUPPLY_HEALTH_OVERHEAT
+
+	/* this is a workaround to support type-c apapter without PD */
+	if (chg->typec_en_dis_active && pval.intval != POWER_SUPPLY_HEALTH_OVERHEAT
 					&& pval.intval != POWER_SUPPLY_HEALTH_COLD)
 	{
 		val->intval = POWER_SUPPLY_STATUS_CHARGING;
@@ -2130,7 +2131,7 @@ int smblib_get_prop_batt_status(struct smb_charger *chg,
 			|| pval.intval == POWER_SUPPLY_HEALTH_WARM)
 		return 0;
 
-	/*rc = smblib_read(chg, BATTERY_CHARGER_STATUS_7_REG, &stat);
+	rc = smblib_read(chg, BATTERY_CHARGER_STATUS_7_REG, &stat);
 	if (rc < 0) {
 		smblib_err(chg, "Couldn't read BATTERY_CHARGER_STATUS_7 rc=%d\n",
 				rc);
@@ -2149,10 +2150,10 @@ int smblib_get_prop_batt_status(struct smb_charger *chg,
 
 	qnovo_en = (bool)(pt_en_cmd & QNOVO_PT_ENABLE_CMD_BIT);
 
-	 ignore stat7 when qnovo is enabled
+	/* ignore stat7 when qnovo is enabled */
 	if (!qnovo_en && !stat)
 		val->intval = POWER_SUPPLY_STATUS_NOT_CHARGING;
-	*/
+
 	return 0;
 }
 
@@ -2503,8 +2504,7 @@ static void smblib_reg_work(struct work_struct *work)
 							icl_settle, usb_cur_in, usb_vol_in);
 		if (!chg->usb_main_psy) {
 			chg->usb_main_psy = power_supply_get_by_name("main");
-		}
-		else {
+		} else {
 			power_supply_get_property(chg->usb_main_psy,
 							POWER_SUPPLY_PROP_CONSTANT_CHARGE_CURRENT_MAX,
 							&val);
@@ -2514,8 +2514,7 @@ static void smblib_reg_work(struct work_struct *work)
 
 		if (!chg->pl.psy) {
 			chg->pl.psy = power_supply_get_by_name("parallel");
-		}
-		else {
+		} else {
 			power_supply_get_property(chg->pl.psy,
 							POWER_SUPPLY_PROP_CONSTANT_CHARGE_CURRENT_MAX,
 							&val);
@@ -2532,8 +2531,7 @@ static void smblib_reg_work(struct work_struct *work)
 
 		schedule_delayed_work(&chg->reg_work,
 			CHARGING_PERIOD_S * HZ);
-	}
-	else
+	} else
 		schedule_delayed_work(&chg->reg_work,
 			NOT_CHARGING_PERIOD_S * HZ);
 }
@@ -4875,7 +4873,6 @@ static void smblib_force_legacy_icl(struct smb_charger *chg, int pst)
 		vote(chg->usb_icl_votable, LEGACY_UNKNOWN_VOTER, true, 500000);
 		break;
 	}
-
 }
 
 static void smblib_notify_extcon_props(struct smb_charger *chg, int id)
@@ -5456,7 +5453,6 @@ static void smblib_handle_typec_insertion(struct smb_charger *chg)
 			smblib_err(chg, "Couldn't to enable DPDM rc=%d\n", rc);
 		typec_sink_removal(chg);
 	}
-
 }
 
 static void smblib_handle_rp_change(struct smb_charger *chg, int typec_mode)
@@ -5529,16 +5525,16 @@ static void smblib_handle_typec_cc_state_change(struct smb_charger *chg)
 		smblib_dbg(chg, PR_MISC, "TypeC %s insertion\n",
 			smblib_typec_mode_name[chg->typec_mode]);
 
-	/*D5X not support wireless charging when otg devices inserted,
-	  but E5 support caused byuse external boost circuit for otg*/
-	if (chg->wireless_charging_flag) {
-		if (chg->typec_mode != POWER_SUPPLY_TYPEC_SINK_AUDIO_ADAPTER)
-			smblib_wireless_set_enable(chg, false);
-	} else {
-		if (chg->typec_mode != POWER_SUPPLY_TYPEC_SINK_AUDIO_ADAPTER &&
-				chg->typec_mode != POWER_SUPPLY_TYPEC_SINK)
-			smblib_wireless_set_enable(chg, false);
-	}
+		/* D5X not support wireless charging when otg devices inserted,
+		  but E5 support caused byuse external boost circuit for otg */
+		if (chg->wireless_charging_flag) {
+			if (chg->typec_mode != POWER_SUPPLY_TYPEC_SINK_AUDIO_ADAPTER)
+				smblib_wireless_set_enable(chg, false);
+		} else {
+			if (chg->typec_mode != POWER_SUPPLY_TYPEC_SINK_AUDIO_ADAPTER &&
+					chg->typec_mode != POWER_SUPPLY_TYPEC_SINK)
+				smblib_wireless_set_enable(chg, false);
+		}
 		smblib_handle_typec_insertion(chg);
 		schedule_delayed_work(&chg->charger_type_recheck, msecs_to_jiffies(20000));
 		schedule_delayed_work(&chg->connector_health_work, 0);
@@ -5588,12 +5584,11 @@ static void smblib_dc_input_current_work(struct work_struct *work)
 	if (IS_ERR(chg->iio.dcin_i_chan))
 		return;
 
-	while(retry)
-	{
+	while(retry) {
 		rc = iio_read_channel_processed(chg->iio.dcin_i_chan, &ret);
 		if (rc > 0)
 			break;
-		else{
+		else {
 			retry--;
 			mdelay(100);
 		}
@@ -5690,8 +5685,8 @@ irqreturn_t smblib_handle_dc_plugin(int irq, void *data)
 		val.intval = chg->dc_temp_level;
 		power_supply_set_property(chg->batt_psy, POWER_SUPPLY_PROP_DC_THERMAL_LEVELS, &val);
 #endif
-	schedule_delayed_work(&chg->dc_input_current_work,
-			msecs_to_jiffies(2000));
+		schedule_delayed_work(&chg->dc_input_current_work,
+				msecs_to_jiffies(2000));
 	}
 	else if (chg->idtp_psy) {
 		cancel_delayed_work_sync(&chg->dc_input_current_work);
@@ -5735,7 +5730,7 @@ irqreturn_t smblib_handle_high_duty_cycle(int irq, void *data)
 static void smblib_bb_removal_work(struct work_struct *work)
 {
 	struct smb_charger *chg = container_of(work, struct smb_charger,
-			   bb_removal_work.work);
+						bb_removal_work.work);
 
 	vote(chg->usb_icl_votable, BOOST_BACK_VOTER, false, 0);
 	vote(chg->awake_votable, BOOST_BACK_VOTER, false, 0);
@@ -6402,8 +6397,8 @@ static void smblib_typec_reenable_work(struct work_struct *work)
 	if (rc < 0)
 		smblib_err(chg, "Couldn't enable type-c rc=%d\n", rc);
 
-	/* wait for type-c detection to complete */
-	//msleep(100);
+		/* wait for type-c detection to complete */
+		//msleep(100);
 	}
 
 unlock:

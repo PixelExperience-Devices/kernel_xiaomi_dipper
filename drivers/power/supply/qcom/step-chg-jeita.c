@@ -432,8 +432,7 @@ static int get_val(struct range_data *range, int hysteresis, int current_index,
 	if (threshold < range[0].low_threshold) {
 			*new_index = 0;
 			*val = range[*new_index].value;
-	}
-	else if (threshold > range[MAX_STEP_CHG_ENTRIES - 1].low_threshold) {
+	} else if (threshold > range[MAX_STEP_CHG_ENTRIES - 1].low_threshold) {
 			*new_index = MAX_STEP_CHG_ENTRIES - 1;
 			*val = range[*new_index].value;
 	}
@@ -586,7 +585,7 @@ static int handle_dynamic_fv(struct step_chg_info *chip)
 	power_supply_get_property(chip->batt_psy,
 		POWER_SUPPLY_PROP_VOLTAGE_NOW, &pval);
 	batt_vol = pval.intval;
-	if (batt_vol >= fv_uv){
+	if (batt_vol >= fv_uv) {
 		goto update_time;
 	}
 
@@ -596,11 +595,11 @@ static int handle_dynamic_fv(struct step_chg_info *chip)
 
 	vote(chip->fv_votable, DYNAMIC_FV_VOTER, true, fv_uv);
 
-	/*set battery full voltage to FLOAT VOLTAGE - 10mV*/
+	/* set battery full voltage to FLOAT VOLTAGE - 10mV */
 	pval.intval = fv_uv - 10000;
 	rc = power_supply_set_property(chip->bms_psy,
 		POWER_SUPPLY_PROP_CONSTANT_CHARGE_VOLTAGE, &pval);
-	if (rc < 0){
+	if (rc < 0) {
 		pr_err("Couldn't set CONSTANT VOLTAGE property rc=%d\n", rc);
 		return rc;
 	}

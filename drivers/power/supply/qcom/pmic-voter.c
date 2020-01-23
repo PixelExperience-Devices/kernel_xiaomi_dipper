@@ -179,7 +179,7 @@ static char *get_client_str(struct votable *votable, int client_id)
 	if (client_id == -EINVAL)
 		return NULL;
 
-	 return votable->client_strs[client_id];
+	return votable->client_strs[client_id];
 }
 
 void lock_votable(struct votable *votable)
@@ -415,6 +415,7 @@ int vote(struct votable *votable, const char *client_str, bool enabled, int val)
 	default:
 		return -EINVAL;
 	}
+
 	/*
 	 * Note that the callback is called with a NULL string and -EINVAL
 	 * result when there are no enabled votes

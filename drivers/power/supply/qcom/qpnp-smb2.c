@@ -191,7 +191,7 @@ struct smb2 {
 	bool			bad_part;
 };
 
-static int __debug_mask = PR_OEM | PR_MISC;
+static int __debug_mask;
 module_param_named(
 	debug_mask, __debug_mask, int, 0600
 );
@@ -1482,8 +1482,8 @@ static int smb2_batt_get_prop(struct power_supply *psy,
 		break;
 	case POWER_SUPPLY_PROP_CURRENT_NOW:
 		rc = smblib_get_prop_from_bms(chg, psp, val);
-	/*	if (!rc)
-			val->intval *= (-1);*/
+		if (!rc)
+			val->intval *= (-1);
 		break;
 	case POWER_SUPPLY_PROP_FCC_STEPPER_ENABLE:
 		val->intval = chg->fcc_stepper_enable;
@@ -1937,7 +1937,7 @@ static int smb2_init_jeita(struct smb2 *chip)
 {
 	struct smb_charger *chg = &chip->chg;
 	int rc;
-/*set cc compensation to 0.3C*/
+	/* set cc compensation to 0.3C */
 	rc = smblib_set_charge_param(chg, &chg->param.jeita_cc_comp, 2225000);
 	if (rc < 0) {
 		pr_err("Couldn't configure jeita_cc rc = %d\n", rc);
@@ -2185,7 +2185,7 @@ static int smb2_init_hw(struct smb2 *chip)
 		return rc;
 	}
 
-	/* set usbin collapse timer*/
+	/* set usbin collapse timer */
 	rc = smblib_masked_write(chg, USBIN_LOAD_CFG_REG,
 				 USBIN_COLLAPSE_SEL_MASK,
 				 0x01);
@@ -3109,7 +3109,6 @@ static struct platform_driver smb2_driver = {
 	.probe		= smb2_probe,
 	.remove		= smb2_remove,
 	.shutdown	= smb2_shutdown,
-
 };
 module_platform_driver(smb2_driver);
 
