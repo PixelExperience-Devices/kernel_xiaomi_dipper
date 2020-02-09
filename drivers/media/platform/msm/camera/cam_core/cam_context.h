@@ -26,9 +26,9 @@ struct cam_context;
 #define CAM_CTX_DEV_NAME_MAX_LENGTH 20
 
 /* max request number */
-#define CAM_CTX_REQ_MAX              48
-#define CAM_CTX_CFG_MAX              48
-#define CAM_CTX_RES_MAX              48
+#define CAM_CTX_REQ_MAX              20
+#define CAM_CTX_CFG_MAX              20
+#define CAM_CTX_RES_MAX              20
 
 /**
  * enum cam_ctx_state -  context top level states
@@ -179,6 +179,7 @@ struct cam_ctx_ops {
  * @refcount:              Context object refcount
  * @node:                  The main node to which this context belongs
  * @sync_mutex:            mutex to sync with sync cb thread
+ * @ctx_released:          whether context is released from umd after acquire
  *
  */
 struct cam_context {
@@ -214,6 +215,7 @@ struct cam_context {
 	struct kref                  refcount;
 	void                        *node;
 	struct mutex                 sync_mutex;
+	bool                         ctx_released;
 };
 
 /**

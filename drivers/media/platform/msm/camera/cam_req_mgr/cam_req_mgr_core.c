@@ -24,32 +24,6 @@
 #include "cam_req_mgr_dev.h"
 
 static struct cam_req_mgr_core_device *g_crm_core_dev;
-static struct cam_req_mgr_core_link g_links[MAXIMUM_LINKS_PER_SESSION];
-
-static void cam_req_mgr_core_link_reset(struct cam_req_mgr_core_link *link)
-{
-	link->link_hdl = 0;
-	link->num_devs = 0;
-	link->max_delay = CAM_PIPELINE_DELAY_0;
-	link->workq = NULL;
-	link->pd_mask = 0;
-	link->l_dev = NULL;
-	link->req.in_q = NULL;
-	link->req.l_tbl = NULL;
-	link->req.num_tbl = 0;
-	link->watchdog = NULL;
-	link->state = CAM_CRM_LINK_STATE_AVAILABLE;
-	link->parent = NULL;
-	link->subscribe_event = 0;
-	link->trigger_mask = 0;
-	link->sync_link = NULL;
-	link->sof_counter = 0;
-	link->sync_self_ref = 0;
-	link->frame_skip_flag = false;
-	link->sync_link_sof_skip = false;
-	link->open_req_cnt = 0;
-	link->last_flush_id = 0;
-}
 
 void cam_req_mgr_handle_core_shutdown(void)
 {
@@ -900,6 +874,14 @@ static int __cam_req_mgr_process_req(struct cam_req_mgr_core_link *link,
 		goto error;
 	}
 
+	if (link->sync_link && link->sync_link->sync_link == link) {
+		if (link->sync_link->sync_trigger_frame_id == 0 && link->sync_trigger_frame_id > 1) {
+			rc = 0;
+			CAM_DBG(CAM_CRM, "Waiting another sensor");
+			goto error;
+		}
+	}
+
 	if ((trigger != CAM_TRIGGER_POINT_SOF) &&
 		(trigger != CAM_TRIGGER_POINT_EOF))
 		goto error;
@@ -1356,25 +1338,25 @@ static struct cam_req_mgr_core_link *__cam_req_mgr_reserve_link(
 			session->num_links, MAXIMUM_LINKS_PER_SESSION);
 		return NULL;
 	}
-	for (i = 0; i < MAXIMUM_LINKS_PER_SESSION; i++) {
-		if (!atomic_cmpxchg(&g_links[i].is_used, 0, 1)) {
-			link = &g_links[i];
-			CAM_DBG(CAM_CRM, "alloc link index %d", i);
-			cam_req_mgr_core_link_reset(link);
-			break;
-		}
-	}
-	if (i == MAXIMUM_LINKS_PER_SESSION)
-		return NULL;
 
+	link = (struct cam_req_mgr_core_link *)
+		kzalloc(sizeof(struct cam_req_mgr_core_link), GFP_KERNEL);
+	if (!link) {
+		CAM_ERR(CAM_CRM, "failed to create link, no mem");
+		return NULL;
+	}
 	in_q = (struct cam_req_mgr_req_queue *)
 		kzalloc(sizeof(struct cam_req_mgr_req_queue), GFP_KERNEL);
 	if (!in_q) {
 		CAM_ERR(CAM_CRM, "failed to create input queue, no mem");
+		kfree(link);
 		return NULL;
 	}
+	mutex_init(&link->lock);
+	spin_lock_init(&link->link_state_spin_lock);
 
 	mutex_lock(&link->lock);
+	link->state = CAM_CRM_LINK_STATE_AVAILABLE;
 	link->num_devs = 0;
 	link->max_delay = 0;
 	memset(in_q->slot, 0,
@@ -1411,6 +1393,7 @@ static struct cam_req_mgr_core_link *__cam_req_mgr_reserve_link(
 	return link;
 error:
 	mutex_unlock(&session->lock);
+	kfree(link);
 	kfree(in_q);
 	return NULL;
 }
@@ -1425,12 +1408,9 @@ error:
  */
 static void __cam_req_mgr_free_link(struct cam_req_mgr_core_link *link)
 {
-	ptrdiff_t i;
 	kfree(link->req.in_q);
 	link->req.in_q = NULL;
-	i = link - g_links;
-	CAM_DBG(CAM_CRM, "free link index %d", i);
-	atomic_set(&g_links[i].is_used, 0);
+	kfree(link);
 }
 
 /**
@@ -1910,6 +1890,7 @@ static int cam_req_mgr_process_trigger(void *priv, void *data)
 		__cam_req_mgr_check_next_req_slot(in_q);
 		__cam_req_mgr_inc_idx(&in_q->rd_idx, 1, in_q->num_slots);
 	}
+	link->sync_trigger_frame_id = trigger_data->frame_id;
 	rc = __cam_req_mgr_process_req(link, trigger_data->trigger);
 	mutex_unlock(&link->req.lock);
 
@@ -2060,8 +2041,8 @@ static int cam_req_mgr_cb_notify_err(
 		rc = -EPERM;
 		goto end;
 	}
-	crm_timer_reset(link->watchdog);
 	spin_unlock_bh(&link->link_state_spin_lock);
+	crm_timer_reset(link->watchdog);
 
 	task = cam_req_mgr_workq_get_task(link->workq);
 	if (!task) {
@@ -2123,8 +2104,8 @@ static int cam_req_mgr_cb_notify_trigger(
 		rc = -EPERM;
 		goto end;
 	}
-	crm_timer_reset(link->watchdog);
 	spin_unlock_bh(&link->link_state_spin_lock);
+	crm_timer_reset(link->watchdog);
 
 	task = cam_req_mgr_workq_get_task(link->workq);
 	if (!task) {
@@ -2704,12 +2685,14 @@ int cam_req_mgr_sync_config(
 	link1->frame_skip_flag = false;
 	link1->sync_link_sof_skip = false;
 	link1->sync_link = link2;
+	link1->sync_trigger_frame_id = 0;
 
 	link2->sof_counter = -1;
 	link2->sync_self_ref = -1;
 	link2->frame_skip_flag = false;
 	link2->sync_link_sof_skip = false;
 	link2->sync_link = link1;
+	link2->sync_trigger_frame_id = 0;
 
 	cam_session->sync_mode = sync_info->sync_mode;
 	CAM_DBG(CAM_REQ,
@@ -2820,7 +2803,7 @@ int cam_req_mgr_link_control(struct cam_req_mgr_link_control *control)
 		link = (struct cam_req_mgr_core_link *)
 			cam_get_device_priv(control->link_hdls[i]);
 		if (!link) {
-			CAM_ERR(CAM_CRM, "Link(%d) is NULL on session 0x%x",
+			CAM_ERR_RATE_LIMIT(CAM_CRM, "Link(%d) is NULL on session 0x%x",
 				i, control->session_hdl);
 			rc = -EINVAL;
 			break;
@@ -2877,7 +2860,6 @@ end:
 
 int cam_req_mgr_core_device_init(void)
 {
-	int i;
 	CAM_DBG(CAM_CRM, "Enter g_crm_core_dev %pK", g_crm_core_dev);
 
 	if (g_crm_core_dev) {
@@ -2894,12 +2876,6 @@ int cam_req_mgr_core_device_init(void)
 	mutex_init(&g_crm_core_dev->crm_lock);
 	cam_req_mgr_debug_register(g_crm_core_dev);
 
-	for (i = 0; i < MAXIMUM_LINKS_PER_SESSION; i++) {
-		mutex_init(&g_links[i].lock);
-		spin_lock_init(&g_links[i].link_state_spin_lock);
-		atomic_set(&g_links[i].is_used, 0);
-		cam_req_mgr_core_link_reset(&g_links[i]);
-	}
 	return 0;
 }
 
