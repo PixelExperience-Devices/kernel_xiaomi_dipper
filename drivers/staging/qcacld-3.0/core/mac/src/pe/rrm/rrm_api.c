@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2012-2018 The Linux Foundation. All rights reserved.
+ * Copyright (c) 2012-2019 The Linux Foundation. All rights reserved.
  *
  * Permission to use, copy, modify, and/or distribute this software for
  * any purpose with or without fee is hereby granted, provided that the
@@ -548,6 +548,13 @@ rrm_process_beacon_report_req(tpAniSirGlobal pMac,
 	pe_info("maxDuration = %d sign = %d maxMeasduration = %d measDuration = %d",
 		maxDuration, sign, maxMeasduration, measDuration);
 
+	if (measDuration == 0 &&
+	    pBeaconReq->measurement_request.Beacon.meas_mode !=
+	    eSIR_BEACON_TABLE) {
+		pe_err("Invalid measurement duration");
+		return eRRM_REFUSED;
+	}
+
 	if (maxMeasduration < measDuration) {
 		if (pBeaconReq->durationMandatory) {
 			pe_err("Dropping the request: duration mandatory and maxduration > measduration");
@@ -575,6 +582,11 @@ rrm_process_beacon_report_req(tpAniSirGlobal pMac,
 	}
 
 	if (pBeaconReq->measurement_request.Beacon.RequestedInfo.present) {
+		if (!pBeaconReq->measurement_request.Beacon.RequestedInfo.
+		    num_requested_eids) {
+			pe_debug("802.11k BCN RPT: Requested num of EID is 0");
+			return eRRM_FAILURE;
+		}
 		pCurrentReq->request.Beacon.reqIes.pElementIds =
 			qdf_mem_malloc(sizeof(uint8_t) *
 				       pBeaconReq->measurement_request.Beacon.
@@ -583,6 +595,7 @@ rrm_process_beacon_report_req(tpAniSirGlobal pMac,
 			pe_err("Unable to allocate memory for request IEs buffer");
 			return eRRM_FAILURE;
 		}
+
 		pCurrentReq->request.Beacon.reqIes.num =
 			pBeaconReq->measurement_request.Beacon.RequestedInfo.
 			num_requested_eids;
@@ -590,6 +603,11 @@ rrm_process_beacon_report_req(tpAniSirGlobal pMac,
 			     pBeaconReq->measurement_request.Beacon.
 			     RequestedInfo.requested_eids,
 			     pCurrentReq->request.Beacon.reqIes.num);
+		pe_debug("802.11k BCN RPT: Requested EIDs: num:[%d]",
+			 pCurrentReq->request.Beacon.reqIes.num);
+		QDF_TRACE_HEX_DUMP(QDF_MODULE_ID_PE, QDF_TRACE_LEVEL_DEBUG,
+			   pCurrentReq->request.Beacon.reqIes.pElementIds,
+			   pCurrentReq->request.Beacon.reqIes.num);
 	}
 
 	if (pBeaconReq->measurement_request.Beacon.num_APChannelReport) {
@@ -740,9 +758,16 @@ rrm_fill_beacon_ies(tpAniSirGlobal pMac,
 	}
 
 	while (BcnNumIes > 0) {
-		len = *(pBcnIes + 1) + 2;       /* element id + length. */
+		len = *(pBcnIes + 1);
+		len += 2;       /* element id + length. */
 		pe_debug("EID = %d, len = %d total = %d",
 			*pBcnIes, *(pBcnIes + 1), len);
+
+		if (BcnNumIes < len) {
+			pe_err("RRM: Invalid IE len:%d exp_len:%d",
+			       len, BcnNumIes);
+			break;
+		}
 
 		if (len <= 2) {
 			pe_err("RRM: Invalid IE");
@@ -1132,28 +1157,30 @@ QDF_STATUS rrm_process_beacon_req(tpAniSirGlobal mac_ctx, tSirMacAddr peer,
  */
 static
 QDF_STATUS update_rrm_report(tpAniSirGlobal mac_ctx,
-			     tpSirMacRadioMeasureReport report,
+			     tpSirMacRadioMeasureReport *report,
 			     tDot11fRadioMeasurementRequest *rrm_req,
 			     uint8_t *num_report, int index)
 {
-	if (report == NULL) {
+	tpSirMacRadioMeasureReport rrm_report;
+
+	if (!*report) {
 		/*
 		 * Allocate memory to send reports for
 		 * any subsequent requests.
 		 */
-		report = qdf_mem_malloc(sizeof(*report) *
+		*report = qdf_mem_malloc(sizeof(tSirMacRadioMeasureReport) *
 			 (rrm_req->num_MeasurementRequest - index));
-		if (NULL == report) {
-			pe_err("Unable to allocate memory during RRM Req processing");
+		if (!*report) {
+			pe_err("Fail to alloc mem during RRM Req processing");
 			return QDF_STATUS_E_NOMEM;
 		}
-		pe_debug("rrm beacon type incapable of %d report",
-			*num_report);
+		pe_debug("rrm beacon type incapable of %d report", *num_report);
 	}
-	report[*num_report].incapable = 1;
-	report[*num_report].type =
+	rrm_report = *report;
+	rrm_report[*num_report].incapable = 1;
+	rrm_report[*num_report].type =
 		rrm_req->MeasurementRequest[index].measurement_type;
-	report[*num_report].token =
+	rrm_report[*num_report].token =
 		 rrm_req->MeasurementRequest[index].measurement_token;
 	(*num_report)++;
 	return QDF_STATUS_SUCCESS;
@@ -1235,7 +1262,7 @@ rrm_process_radio_measurement_request(tpAniSirGlobal mac_ctx,
 			break;
 		default:
 			/* Send a report with incapabale bit set. */
-			status = update_rrm_report(mac_ctx, report, rrm_req,
+			status = update_rrm_report(mac_ctx, &report, rrm_req,
 						   &num_report, i);
 			if (QDF_STATUS_SUCCESS != status)
 				return status;
