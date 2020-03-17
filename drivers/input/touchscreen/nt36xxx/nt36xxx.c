@@ -1001,7 +1001,6 @@ static void nvt_switch_mode_work(struct work_struct *work)
 	struct nvt_mode_switch *ms = container_of(work, struct nvt_mode_switch, switch_mode_work);
 	struct nvt_ts_data *data = ms->nvt_data;
 	unsigned char value = ms->mode;
-	char ch[64] = {0x0,};
 
 	if (value >= INPUT_EVENT_WAKUP_MODE_OFF && value <= INPUT_EVENT_WAKUP_MODE_ON)
 		data->gesture_enabled = value - INPUT_EVENT_WAKUP_MODE_OFF;
