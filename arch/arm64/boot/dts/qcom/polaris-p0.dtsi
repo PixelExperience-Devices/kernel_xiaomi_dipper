@@ -150,7 +150,7 @@
 	thermal-message {
 		thermal,batt-array-size = "13";
 		thermal,batt-level-screen-on = "0 2 4 6 8 9 10 11 12 13 14 14 16";
-		thermal,batt-level-screen-off = "0 1 1 1 3 4 5 5 5 7 9 14 16";
+		thermal,batt-level-screen-off = "0 1 1 1 3 5 6 6 6 7 9 14 16";
 	};
 
 };
@@ -750,7 +750,106 @@
 	};
 };
 
+&low_vbat {
+	temperature = <3200>;
+	hysteresis = <100>;
+	type = "passive";
+};
+
+&low_soc {
+	temperature = <10>;
+	hysteresis = <0>;
+	type = "passive";
+};
+
+&ibat_high {
+	temperature = <5000>;
+	hysteresis = <200>;
+	type = "passive";
+};
+
 &thermal_zones {
+	vbat {
+		polling-delay-passive = <100>;
+
+		cooling-maps {
+			vbat_cpu4 {
+				trip = <&low_vbat>;
+				cooling-device =
+					<&CPU4 18 18>;
+			};
+			vbat_cpu5 {
+				trip = <&low_vbat>;
+				cooling-device =
+					<&CPU5 18 18>;
+			};
+			vbat_map6 {
+				trip = <&low_vbat>;
+				cooling-device =
+					<&CPU6 18 18>;
+			};
+			vbat_map7 {
+				trip = <&low_vbat>;
+				cooling-device =
+					<&CPU7 18 18>;
+			};
+		};
+	};
+
+	soc {
+		polling-delay-passive = <0>;
+
+		cooling-maps {
+			soc_cpu4 {
+				trip = <&low_soc>;
+				cooling-device =
+					<&CPU4 18 18>;
+			};
+			soc_cpu5 {
+				trip = <&low_soc>;
+				cooling-device =
+					<&CPU5 18 18>;
+			};
+			soc_map6 {
+				trip = <&low_soc>;
+				cooling-device =
+					<&CPU6 18 18>;
+			};
+			soc_map7 {
+				trip = <&low_soc>;
+				cooling-device =
+					<&CPU7 18 18>;
+			};
+		};
+	};
+
+	ibat-high {
+		polling-delay-passive = <100>;
+
+		cooling-maps {
+			ibat_cpu4 {
+				trip = <&ibat_high>;
+				cooling-device =
+					<&CPU4 18 18>;
+			};
+			ibat_cpu5 {
+				trip = <&ibat_high>;
+				cooling-device =
+					<&CPU5 18 18>;
+			};
+			ibat_cpu6 {
+				trip = <&ibat_high>;
+				cooling-device =
+					<&CPU6 18 18>;
+			};
+			ibat_cpu7 {
+				trip = <&ibat_high>;
+				cooling-device =
+					<&CPU7 18 18>;
+			};
+		};
+	};
+
 	xo_therm {
 		polling-delay-passive = <0>;
 		polling-delay = <0>;
